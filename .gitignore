@@ -1,3 +1,19 @@
-# Venv
+# Fichiers Python
+__pycache__/
+*.py[cod]
+
+# Environnements virtuels
 venv/
-taf.ipynb
+env/
+
+# Fichiers temporaires
+*.log
+*.tmp
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers d’éditeur
+.vscode/
+.idea/

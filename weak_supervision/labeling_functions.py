@@ -10,6 +10,8 @@ from nltk.corpus import wordnet
 from snorkel.labeling import LabelingFunction, labeling_function
 from snorkel.preprocess import preprocessor
 from textblob import TextBlob
+import operator as op
+from typing import Callable
 
 
 # Global Variables
@@ -37,26 +39,25 @@ def textblob_subjectivity(x):
     return x
 
 ### NLP labeling functions
-def lfg_polarity(operator: str,
+
+def lfg_polarity(op_func: Callable[[float, float], bool],
                 bound: float,                  
                 CONSTANT: int,
                 name: str = 'polarityLabelingFunction',
                 ABSTAIN: int = -1
                 ):
     def lf_polarity(x):
-        condition = eval(f"{x.polarity}"+operator+f"{bound}")
-        return CONSTANT if condition else ABSTAIN
+        return CONSTANT if op_func(x.polarity, bound) else ABSTAIN
     return LabelingFunction(name=name, f=lf_polarity, pre=[textblob_polarity])
 
-def lfg_subjectivity(operator: str,
+def lfg_subjectivity(op_func: Callable[[float, float], bool],
                     bound: float,
                     CONSTANT: int,
                     name: str = 'subjectivityLabelingFunction',
                     ABSTAIN: int = -1,
                     ):
     def lf_subjectivity(x):
-        condition = eval(f"{x.subjectivity}"+operator+f"{bound}")
-        return CONSTANT if condition else ABSTAIN
+        return CONSTANT if op_func(x.subjectivity, bound) else ABSTAIN
     return LabelingFunction(name=name, f=lf_subjectivity, pre=[textblob_subjectivity])
 
 
@@ -67,14 +68,12 @@ def lfg_subjectivity(operator: str,
 
 ### length labeling function
 def lfg_lengthtext(min_characters: int,
-                            operator: str,
+                            op_func: Callable[[float, float], bool],
                             CONSTANT: int,
                             name: str = 'lengthtextLabelingFunction',
                             ABSTAIN: int = -1):
     def lf_lengthtext(x):
-        condition = eval("len(x.text)"+operator+f"{min_characters}")
-        return CONSTANT if condition else ABSTAIN
-
+        return CONSTANT if op_func(len(x.text), min_characters) else ABSTAIN
     return LabelingFunction(name=name, f=lf_lengthtext)
 
 ### Keyword labeling function
@@ -144,10 +143,10 @@ def get_worker_dicts(annotations: pd.DataFrame) -> dict:
 def get_lfs(path_keywords: str, path_annotations: str) -> dict:
     lfs = dict()
 
-    lfs['polarity_negative'] = lfg_polarity(-0.25, '<', ABUSE, name='polarity_negative')
-    lfs['polarity_positive'] = lfg_polarity(0.1, '>=', NOT_ABUSE, name='polarity_positive')
+    lfs['polarity_negative'] = lfg_polarity(op.lt, -0.25, ABUSE, name='polarity_negative')
+    lfs['polarity_positive'] = lfg_polarity(op.ge, 0.1, NOT_ABUSE, name='polarity_positive')
 
-    lfs['length_text'] = lfg_lengthtext(9500, ">", ABUSE)
+    lfs['length_text'] = lfg_lengthtext(9500, op.gt, ABUSE)
 
     badwords = load_keywords(path_keywords)
     lfs['badwords'] = lfg_keywords(badwords, ABUSE)
@@ -189,10 +188,10 @@ goodwords = [s.lower().replace('_', ' ') for s in np.unique(np.array(goodwords))
 def get_lfs_imdb(treshold_abuse: float = -0.05, treshold_notabuse: float = 0., treshold_subjectivity: float = 0.3) -> dict:
     lfs = dict()
 
-    lfs['polarity_negative'] = lfg_polarity('<', treshold_abuse, NOT_ABUSE, name='polarity_negative')
-    lfs['polarity_positive'] = lfg_polarity('>=', treshold_notabuse, ABUSE, name='polarity_positive')
+    lfs['polarity_negative'] = lfg_polarity(op.lt, treshold_abuse, NOT_ABUSE, name='polarity_negative')
+    lfs['polarity_positive'] = lfg_polarity(op.ge, treshold_notabuse, ABUSE, name='polarity_positive')
 
-    lfs['subjectivity'] = lfg_subjectivity('<', treshold_subjectivity, ABUSE, name='subjectivity')
+    lfs['subjectivity'] = lfg_subjectivity(op.lt, treshold_subjectivity, ABUSE, name='subjectivity')
 
     lfs['badwords'] = lfg_keywords(badwords, NOT_ABUSE, name='badwords')
     lfs['goodwords'] = lfg_keywords(goodwords, ABUSE, name='goodwords')
